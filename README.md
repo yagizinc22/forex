@@ -1,6 +1,6 @@
 # Market AI
 
-BIST hisseleri icin veri, teknik gostergeler, sinyal testi, toplu tarama ve risk hesaplama altyapisi.
+BIST hisseleri icin veri, teknik gostergeler, sinyal testi, toplu tarama, risk hesaplama ve event-driven backtest altyapisi.
 
 > Bu proje egitim ve arastirma amaclidir. Yatirim tavsiyesi veya garanti getiri sistemi degildir.
 
@@ -21,6 +21,24 @@ BIST hisseleri icin veri, teknik gostergeler, sinyal testi, toplu tarama ve risk
 - Veri gelmeyen sembolleri hata listesinde raporlar.
 
 `setup_score` gelecek getiri olasiligi degildir. Yalnizca trend, momentum, hacim ve volatilite tercihlerimize ne kadar uyuldugunu gosteren seffaf bir rules-fit puanidir.
+
+## v0.3
+
+- Tek pozisyonlu, long-only event-driven backtest motoru
+- Sinyal kapanista okunur; giris sonraki seans acilisinda yapilir
+- ATR tabanli stop ve R-multiple tabanli hedef
+- Portfoy risk yuzdesine gore pozisyon boyutu
+- Nakit limiti; kaldirac yok
+- Ayni anda yalnizca tek acik pozisyon; cakisan islemler yok
+- Stop/target ayni gun gorulurse konservatif olarak stop once kabul edilir
+- Gap stop ve gap target mantigi
+- Maksimum elde tutma suresi ve time exit
+- Komisyon ve slippage varsayimlari
+- Gunluk equity curve
+- Total return, CAGR, max drawdown, Sharpe, Sortino
+- Win rate, profit factor, expectancy (R), ortalama islem getirisi
+- Ortalama elde tutma, maksimum ardisik kayip ve exposure
+- Ayrintili trade log
 
 ## Kurulum
 
@@ -66,7 +84,23 @@ Yalnizca baseline sinyali aktif olanlar:
 python -m app.scanner_cli --signals-only --top 30
 ```
 
-## v0.1 sinyal mantigi
+## v0.3 event-driven backtest
+
+Varsayilanlar: 100.000 TL baslangic, islem basina %0.5 risk, 2 ATR stop, 2R hedef, 20 gun max hold, 10 bps komisyon ve 5 bps slippage.
+
+```bash
+python -m app.backtest_cli THYAO --period 5y
+```
+
+Parametreli ornek:
+
+```bash
+python -m app.backtest_cli THYAO --period 10y --initial-cash 100000 --risk-pct 0.5 --stop-atr 2 --target-r 2 --max-hold 20 --fee-bps 10 --slippage-bps 5 --show-trades 20
+```
+
+Backtest varsayimlari ozellikle konservatiftir. Gunluk OHLC verisinde stop ve hedefin hangi sirayla tetiklendigi bilinemez; ikisi de ayni bar icinde gorulurse stop once kabul edilir.
+
+## Baseline sinyal mantigi
 
 Sinyal su kosullarin ayni anda saglanmasidir:
 
@@ -92,11 +126,11 @@ Toplam 100 puan:
 
 Puanlama kodu `app/scanner/score.py` dosyasinda acikca gorulebilir ve test edilebilir.
 
-## Backtest hakkinda
+## Iki farkli backtest ne ise yarar?
 
-Mevcut backtest sinyalin tahmin gucunu izole etmek icin her sinyali bagimsiz bir 1 gunluk islem olarak olcer: sinyal gununun ardindaki acilistan, onu takip eden acilisa. Komisyon/slippage icin `fee_bps` maliyeti dusulur. Sinyaller ust uste binebilir; bu nedenle bu modul tam portfoy simulasyonu degil, **signal-edge testi**dir.
+`app/backtest/signal_edge.py`: her sinyali bagimsiz bir sonraki-acilis -> sonraki-acilis islemi olarak olcer. Bu, sinyalin kisa vadeli tahmin gucunu hizli test etmek icindir; portfoy simulasyonu degildir.
 
-Sonraki adim: event-driven, cakismayan pozisyonlar, gunluk equity curve, max drawdown ve Sharpe/Sortino.
+`app/backtest/event_driven.py`: islemleri sirayla gerceklestirir, pozisyonlarin cakismasina izin vermez, sermaye ve risk boyutlandirmasini kullanir ve equity curve olusturur. Strateji performansi icin esas test motoru budur.
 
 ## Proje yapisi
 
@@ -106,14 +140,27 @@ app/
   indicators/technical.py
   strategies/baseline.py
   backtest/signal_edge.py
+  backtest/event_driven.py
   risk/position_sizing.py
   scanner/score.py
   scanner/bist_scanner.py
   universe/bist100.py
   main.py
   scanner_cli.py
+  backtest_cli.py
 tests/
+.github/workflows/tests.yml
 ```
+
+## Otomatik testler
+
+Her `main` push'unda ve pull request'te GitHub Actions uzerinden:
+
+```bash
+pytest -q
+```
+
+calisir.
 
 ## Veri
 
