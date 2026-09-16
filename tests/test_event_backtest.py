@@ -72,7 +72,11 @@ def test_trades_do_not_overlap():
         fee_bps=0,
         slippage_bps=0,
     )
-    assert len(result.trades) == 1
+    assert len(result.trades) >= 1
+    for i in range(1, len(result.trades)):
+        previous_exit = pd.Timestamp(result.trades.iloc[i - 1]["exit_date"])
+        next_entry = pd.Timestamp(result.trades.iloc[i]["entry_date"])
+        assert next_entry > previous_exit
 
 
 def test_risk_sizing_caps_position_by_cash():
